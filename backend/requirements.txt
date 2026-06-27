@@ -1,0 +1,15 @@
+fastapi[standard]
+uvicorn
+python-dotenv
+anthropic
+openai
+keyring
+sqlmodel
+pydantic
+jieba
+python-multipart
+aiofiles
+pymysql
+pytest
+httpx
+pyyaml

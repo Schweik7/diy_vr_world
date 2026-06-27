@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A-Frame WebVR Example with Fixed Fairy and Angry Stone Interaction</title>
+  <script src="./aframe.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="style.css">
+
+</head>
+<body>
+  <!-- 用户名弹窗 -->
+  <div id="username-modal"
+  style="display: none; flex-direction: column; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.7); z-index: 9999999;">
+ <div style="background: white; padding: 20px; border-radius: 8px; text-align: center;">
+     <h2>请输入您的用户名</h2>
+     <input type="text" id="username-input" placeholder="输入用户名" 
+            style="padding: 8px; width: 100%; margin-top: 10px;" />
+     <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+         <button id="submit-username" style="padding: 8px 16px; flex-grow: 1; margin-right: 10px;">确认</button>
+         <button id="cancel-username" style="padding: 8px 16px; flex-grow: 1; background-color: #f0f0f0;">取消</button>
+     </div>
+ </div>
+</div>
+  <!-- 对话框区域 -->
+  <div id="dialogue-container">
+    <!-- 展开按钮 -->
+    <button id="expand-button">
+      <!-- 插入展开按钮的 SVG 图标 -->
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <path fill="rgba(255, 255, 255, 0.5)"
+          d="m12 11.325l2.375 2.375q.275.275.688.275t.712-.275q.3-.3.3-.712t-.3-.713L12.7 9.2q-.3-.3-.7-.3t-.7.3l-3.1 3.1q-.3.3-.287.7t.312.7q.3.275.7.288t.7-.288zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22" />
+      </svg>
+    </button>
+    <!-- 对话内容 -->
+    <div id="dialogue-content" style="height: 15vh;"></div>
+
+    <!-- 对话输入区域 -->
+    <div id="dialogue-input">
+      <input type="text" id="input-box" placeholder="一起聊聊天...">
+      <button id="send-button">
+        <!-- 插入SVG图标 -->
+        <svg id="icon-svg" viewBox="0 0 20 20" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+        <g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"><path d="M2.5 8a.5.5 0 0 1 .5.5V17h14V8.5a.5.5 0 0 1 1 0v9a.5.5 0 0 1-.5.5h-15a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5"/><path d="M3 5.5a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v4.67a.5.5 0 0 1-.223.416l-6.5 4.33a.5.5 0 0 1-.554 0l-6.5-4.33A.5.5 0 0 1 3 10.17zM4 6v3.902l6 3.997l6-3.997V6z"/><path d="M9.723 2.084a.5.5 0 0 1 .554 0l4.5 3l-.554.832L10 3.101L5.777 5.916l-.554-.832zm7.131 5.062l1 1l-.708.708l-1-1zm-13 .708l-1 1l-.708-.708l1-1zM6.75 8A.25.25 0 0 1 7 7.75h6a.25.25 0 1 1 0 .5H7A.25.25 0 0 1 6.75 8m.5 2a.25.25 0 0 1 .25-.25h5a.25.25 0 1 1 0 .5h-5a.25.25 0 0 1-.25-.25"/></g>
+        </svg>
+      </button>
+      <button id="voice-button">
+        <!-- 插入语音按钮的 SVG 图标 -->
+        <svg id="icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20">
+          <path fill="currentColor" 
+          d="M17.132 1.06a.5.5 0 0 1 .677.203A9.96 9.96 0 0 1 19 6a9.96 9.96 0 0 1-1.19 4.737a.5.5 0 1 1-.881-.474A8.96 8.96 0 0 0 18 6a8.96 8.96 0 0 0-1.071-4.263a.5.5 0 0 1 .203-.677m-2.325 1.974a.5.5 0 0 1 .654.269A7 7 0 0 1 16 6a7 7 0 0 1-.539 2.697a.5.5 0 1 1-.922-.385A6 6 0 0 0 15 6c0-.82-.164-1.6-.461-2.312a.5.5 0 0 1 .268-.654M5 6a4 4 0 1 1 8 0a4 4 0 0 1-8 0m4-3a3 3 0 1 0 0 6a3 3 0 0 0 0-6M2 13c0-1.113.903-2 2.009-2H14a2 2 0 0 1 2 2c0 1.691-.833 2.966-2.135 3.797C12.583 17.614 10.855 18 9 18s-3.583-.386-4.865-1.203C2.833 15.967 2 14.69 2 13m2.009-1C3.448 12 3 12.447 3 13c0 1.309.622 2.284 1.673 2.953C5.743 16.636 7.265 17 9 17s3.257-.364 4.327-1.047C14.377 15.283 15 14.31 15 13a1 1 0 0 0-1-1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 展开式菜单 -->
+  <div id="menu-container">
+    <!-- 主菜单按钮 -->
+    <button id="menu-toggle" title="菜单">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>
+      </svg>
+    </button>
+
+    <!-- 展开的菜单项 -->
+    <div id="menu-items">
+      <button id="camera-button" class="menu-item" data-label="拍照">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 17.5a5.5 5.5 0 1 0 0-11a5.5 5.5 0 0 0 0 11m0-2a3.5 3.5 0 1 1 0-7a3.5 3.5 0 0 1 0 7M4 5h3l1.5-2h7L17 5h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2"/>
+        </svg>
+        <span class="menu-label">拍照</span>
+      </button>
+
+      <button id="share-button" class="menu-item" data-label="分享">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 1 0-3-3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 1 0 0 6c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66a2.92 2.92 0 0 0 2.92 2.92A2.92 2.92 0 0 0 21 19a2.92 2.92 0 0 0-3-2.92"/>
+        </svg>
+        <span class="menu-label">分享</span>
+      </button>
+
+      <button id="config-button" class="menu-item" data-label="设置">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94c0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6s3.6 1.62 3.6 3.6s-1.62 3.6-3.6 3.6"/>
+        </svg>
+        <span class="menu-label">设置</span>
+      </button>
+
+      <button id="profile-button" class="menu-item" data-label="个人中心">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10m0 2c-5.33 0-8 2.67-8 6v2h16v-2c0-3.33-2.67-6-8-6"/>
+        </svg>
+        <span class="menu-label">个人中心</span>
+      </button>
+
+      <button id="library-button" class="menu-item" data-label="场景库">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M4 4h7v7H4zm9 0h7v7h-7zm-9 9h7v7H4zm9 0h7v7h-7z"/>
+        </svg>
+        <span class="menu-label">场景库</span>
+      </button>
+
+      <button id="music-button" class="menu-item" data-label="音乐">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512">
+          <path fill="currentColor" d="M98.05 18.54c-11.46-.08-23.59 1.28-36.08 3.99L130.1 261.1c-14.2-5.1-31.18-6.2-48.09-3.2c-39.17 6.9-67.15 33.8-62.52 59.8c4.64 26.1 40.14 41.7 79.33 34.7c39.08-6.9 67.08-33.7 62.38-59.8c-22.1-80.8-44.4-163-66.39-244.21c50.69 3.59 72.59 31.58 90.59 60.31c-.5-62.33-37.7-89.81-87.35-90.16m310.65 30.7c-13.9.1-28.8 2.59-44.1 7.22l87.1 232.44c-14.6-3.9-31.6-3.7-48.3.7c-38.4 10-64.2 39-57.5 64.6c6.7 25.7 43.4 38.3 81.8 28.2c38.5-10 64.2-39 57.5-64.6c-28.6-78.8-57.3-158.9-85.8-238.2c50.8-.5 74.9 25.7 95.2 52.9c-5.2-58.55-40.4-83.61-85.9-83.26M258.4 163.5l1.8 248.1c-12.3-8.6-28.4-14.3-45.6-15.9c-39.4-3.8-73.7 14.5-76.2 41c-2.5 26.3 27.7 50.8 67.1 54.5c39.7 3.9 73.7-14.5 76.3-40.9c.2-83.8.8-168.9 1.3-253.1c47.9 17 61.6 49.8 71.2 82.4c19.9-74.1-27.9-112.3-95.9-116.1"/>
+        </svg>
+        <span class="menu-label">音乐</span>
+      </button>
+
+      <button id="autoplay-button" class="menu-item" data-label="自动播放">
+        <svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+          <path d="M896 512L384 832V192z"></path>
+        </svg>
+        <span class="menu-label">自动播放</span>
+      </button>
+
+      <button id="fullscreen-button" class="menu-item" data-label="全屏">
+        <svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+          <path d="M795.5 192H581c-19.6 0-35.6 15.7-36 35.3-0.4 20.3 16.4 36.7 36.7 36.7h128.4L581 393.1c-14 14-14 36.9 0 50.9s36.9 14 50.9 0L760 315.9v129c0 19.6 15.8 35.6 35.3 36 20.2 0.4 36.7-16.4 36.7-36.7V228.5c0-20.1-16.3-36.5-36.5-36.5zM442.2 760H313.8L443 630.9c14-14 14-36.9 0-50.9s-36.9-14-50.9 0L264 708.1V579c0-19.6-15.8-35.6-35.3-36-20.2-0.4-36.7 16.4-36.7 36.7v215.6c0 20.3 16.4 36.7 36.7 36.7H443c19.6 0 35.6-15.7 36-35.3 0.3-20.3-16.5-36.7-36.8-36.7z"/>
+        </svg>
+        <span class="menu-label">全屏</span>
+      </button>
+    </div>
+  </div>
+
+  <audio id="background-music" src="./forest_lake.mp3"></audio>
+
+  <!-- 世界配置面板 -->
+  <div id="config-panel" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9999999; justify-content: center; align-items: center;">
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 16px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: #d4af37;">自定义我的世界</h2>
+        <button id="close-config" style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">&times;</button>
+      </div>
+
+      <!-- 场景信息与可见性 -->
+      <div class="config-section" style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #4a4a6a;">
+        <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">场景名称</label>
+        <input type="text" id="scene-name" placeholder="给你的心声世界起个名字..."
+          style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; box-sizing: border-box;">
+        <label style="display: block; margin: 12px 0 8px; color: #a0a0a0;">场景简介</label>
+        <textarea id="scene-description" placeholder="一句话介绍这个场景，会展示在场景库中..."
+          style="width: 100%; height: 50px; padding: 10px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; resize: vertical; box-sizing: border-box;"></textarea>
+        <label style="display: block; margin: 12px 0 8px; color: #a0a0a0;">可见性</label>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <select id="scene-visibility"
+            style="flex: 1; min-width: 150px; padding: 10px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; cursor: pointer;">
+            <option value="private">🔒 仅自己可见</option>
+            <option value="public">🌍 公开到场景库</option>
+          </select>
+          <button id="save-scene-meta" style="padding: 10px 16px; background: #5a5a8a; border: none; border-radius: 8px; color: #fff; cursor: pointer; white-space: nowrap;">保存信息</button>
+        </div>
+        <span id="scene-meta-status" style="display: block; margin-top: 8px; font-size: 13px; color: #7ec8e3;"></span>
+        <p style="font-size: 12px; color: #666; margin-top: 5px;">公开后，其他人可在「场景库」中体验你的场景与互动</p>
+      </div>
+
+      <!-- 天空贴图上传 -->
+      <div class="config-section" style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">天空背景图片</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="file" id="sky-texture-input" accept=".jpg,.jpeg,.png,.webp,.hdr" style="display: none;">
+          <button onclick="document.getElementById('sky-texture-input').click()" style="padding: 10px 20px; background: #4a4a6a; border: none; border-radius: 8px; color: #fff; cursor: pointer;">选择图片</button>
+          <span id="sky-texture-status" style="color: #7ec8e3;"></span>
+        </div>
+        <p style="font-size: 12px; color: #666; margin-top: 5px;">支持格式: JPG, PNG, WebP, HDR</p>
+      </div>
+
+      <!-- 身外化身模型上传 -->
+      <div class="config-section" style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">身外化身3D模型</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="file" id="fairy-model-input" accept=".gltf,.glb" style="display: none;">
+          <button onclick="document.getElementById('fairy-model-input').click()" style="padding: 10px 20px; background: #4a4a6a; border: none; border-radius: 8px; color: #fff; cursor: pointer;">选择模型</button>
+          <span id="fairy-model-status" style="color: #7ec8e3;"></span>
+        </div>
+        <p style="font-size: 12px; color: #666; margin-top: 5px;">支持格式: GLTF, GLB</p>
+      </div>
+
+      <!-- 背景音乐上传 -->
+      <div class="config-section" style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">背景音乐</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="file" id="music-input" accept=".mp3,.wav,.ogg" style="display: none;">
+          <button onclick="document.getElementById('music-input').click()" style="padding: 10px 20px; background: #4a4a6a; border: none; border-radius: 8px; color: #fff; cursor: pointer;">选择音乐</button>
+          <span id="background-music-status" style="color: #7ec8e3;"></span>
+        </div>
+        <p style="font-size: 12px; color: #666; margin-top: 5px;">支持格式: MP3, WAV, OGG</p>
+      </div>
+
+      <!-- 系统提示词 -->
+      <div class="config-section" style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">身外化身性格设定 (System Prompt)</label>
+        <textarea id="prompt-text" placeholder="定义身外化身的性格、说话方式和行为准则..." style="width: 100%; height: 100px; padding: 10px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; resize: vertical;"></textarea>
+        <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+          <button id="save-prompt-text" style="padding: 8px 16px; background: #5a5a8a; border: none; border-radius: 6px; color: #fff; cursor: pointer;">保存文本</button>
+          <span>或</span>
+          <input type="file" id="prompt-input" accept=".md,.txt" style="display: none;">
+          <button onclick="document.getElementById('prompt-input').click()" style="padding: 8px 16px; background: #4a4a6a; border: none; border-radius: 6px; color: #fff; cursor: pointer;">上传文件</button>
+          <span id="system-prompt-status" style="color: #7ec8e3;"></span>
+        </div>
+      </div>
+
+      <!-- 初次见面语 -->
+      <div class="config-section" style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">初次见面语</label>
+        <textarea id="greeting-text" placeholder="当用户第一次进入时，身外化身说的第一句话..." style="width: 100%; height: 60px; padding: 10px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; resize: vertical;">欢迎来到这片充满魔法的森林！(^_^) 我是森林精灵絮语，很高兴遇见你~</textarea>
+        <button id="save-greeting" style="margin-top: 10px; padding: 8px 16px; background: #5a5a8a; border: none; border-radius: 6px; color: #fff; cursor: pointer;">保存</button>
+      </div>
+
+      <!-- AI模型选择 -->
+      <div id="llm-selector-container" class="config-section" style="margin-bottom: 20px; display: none;">
+        <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">AI 模型选择</label>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <select id="llm-selector" style="flex: 1; min-width: 150px; padding: 10px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; cursor: pointer;">
+          </select>
+          <button id="test-llm-btn" style="padding: 10px 16px; background: #4a6a4a; border: none; border-radius: 8px; color: #fff; cursor: pointer; white-space: nowrap;">测试连接</button>
+        </div>
+        <div id="llm-test-status" style="margin-top: 8px; font-size: 13px; min-height: 20px;"></div>
+        <p style="font-size: 12px; color: #666; margin-top: 5px;">选择身外化身使用的AI大脑</p>
+      </div>
+
+      <div style="text-align: center; padding-top: 10px; border-top: 1px solid #4a4a6a;">
+        <p style="font-size: 12px; color: #666;">上传的资源会自动应用到你的世界中</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 拍照预览弹窗 -->
+  <div id="photo-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999999; justify-content: center; align-items: center; flex-direction: column;">
+    <div style="position: relative; max-width: 90vw; max-height: 80vh;">
+      <img id="photo-preview" style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+        <button id="download-photo" style="padding: 12px 24px; background: #4ade80; border: none; border-radius: 8px; color: #000; font-size: 16px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M5 20h14v-2H5v2zm7-18l-5 5h3v9h4V7h3l-5-5z" transform="rotate(180 12 12)"/></svg>
+          下载照片
+        </button>
+        <button id="close-photo" style="padding: 12px 24px; background: #6b7280; border: none; border-radius: 8px; color: #fff; font-size: 16px; cursor: pointer;">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分享弹窗 -->
+  <div id="share-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9999999; justify-content: center; align-items: center;">
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 16px; max-width: 450px; width: 90%; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: #d4af37;">分享我的世界</h2>
+        <button id="close-share" style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">&times;</button>
+      </div>
+
+      <div id="share-content">
+        <p style="color: #a0a0a0; margin-bottom: 15px;">生成专属分享链接，让朋友也能体验你的世界！</p>
+
+        <div id="share-link-container" style="display: none;">
+          <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">分享链接</label>
+          <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <input type="text" id="share-link" readonly style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; font-size: 14px;">
+            <button id="copy-link" style="padding: 12px 16px; background: #4a6a4a; border: none; border-radius: 8px; color: #fff; cursor: pointer; white-space: nowrap;">复制</button>
+          </div>
+
+          <label style="display: block; margin-bottom: 8px; color: #a0a0a0;">分享文案</label>
+          <textarea id="share-text" readonly style="width: 100%; height: 80px; padding: 12px; border-radius: 8px; border: 1px solid #4a4a6a; background: #2a2a4a; color: #fff; font-size: 14px; resize: none;"></textarea>
+          <button id="copy-all" style="margin-top: 10px; padding: 12px 20px; background: #d4af37; border: none; border-radius: 8px; color: #000; font-size: 14px; cursor: pointer; width: 100%;">一键复制链接和文案</button>
+
+          <div id="share-stats" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: center;">
+            <span style="color: #7ec8e3;">已被浏览 <span id="view-count">0</span> 次</span>
+          </div>
+        </div>
+
+        <div id="share-generate" style="text-align: center;">
+          <button id="generate-share" style="padding: 15px 30px; background: linear-gradient(135deg, #d4af37, #f0c14b); border: none; border-radius: 8px; color: #000; font-size: 16px; cursor: pointer; font-weight: bold;">生成分享链接</button>
+        </div>
+      </div>
+
+      <div id="share-status" style="margin-top: 15px; text-align: center; min-height: 24px;"></div>
+    </div>
+  </div>
+
+  <!-- 个人中心弹窗 -->
+  <div id="profile-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9999999; justify-content: center; align-items: center;">
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 16px; max-width: 720px; width: 92%; max-height: 86vh; overflow-y: auto; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: #d4af37;">个人中心</h2>
+        <button id="close-profile" style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">&times;</button>
+      </div>
+
+      <!-- 个人资料 -->
+      <div style="display: flex; align-items: center; gap: 16px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 20px;">
+        <div id="profile-avatar" style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #d4af37, #f0c14b); display: flex; align-items: center; justify-content: center; font-size: 28px; color: #1a1a2e; font-weight: bold;">心</div>
+        <div style="flex: 1;">
+          <div id="profile-username" style="font-size: 20px; font-weight: bold;">访客</div>
+          <div id="profile-stats" style="font-size: 13px; color: #a0a0a0; margin-top: 4px;">— 个场景 · 累计被体验 — 次</div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0; color: #c0c0d0; font-size: 16px;">我的心声场景</h3>
+        <button id="create-scene-btn" style="padding: 8px 16px; background: linear-gradient(135deg, #d4af37, #f0c14b); border: none; border-radius: 8px; color: #1a1a2e; cursor: pointer; font-weight: bold;">+ 新建场景</button>
+      </div>
+
+      <div id="my-worlds-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;">
+        <!-- JS填充 -->
+      </div>
+      <p id="profile-empty-hint" style="display: none; text-align: center; color: #666; padding: 20px;">还没有场景，点击「新建场景」开始创作吧~</p>
+    </div>
+  </div>
+
+  <!-- 心声世界场景库弹窗 -->
+  <div id="library-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9999999; justify-content: center; align-items: center;">
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 16px; max-width: 860px; width: 94%; max-height: 88vh; overflow-y: auto; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h2 style="margin: 0; color: #d4af37;">心声世界 · 场景库</h2>
+        <button id="close-library" style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="color: #a0a0a0; margin: 0 0 18px; font-size: 14px;">这里是大家公开分享的心声世界，点击「体验」走进TA的场景，与TA的精灵对话互动。</p>
+      <div id="library-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+        <!-- JS填充 -->
+      </div>
+      <p id="library-empty-hint" style="display: none; text-align: center; color: #666; padding: 30px;">场景库还空空如也，快去个人中心公开你的第一个场景吧~</p>
+    </div>
+  </div>
+
+  <!-- 访客模式提示条 -->
+  <div id="visitor-banner" style="display: none; position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(90deg, #d4af37, #f0c14b); color: #000; padding: 10px 20px; z-index: 9999998; text-align: center; font-size: 14px;">
+    <span id="visitor-world-name">正在浏览分享的世界</span>
+    <button id="create-own-world" style="margin-left: 15px; padding: 5px 15px; background: #1a1a2e; border: none; border-radius: 4px; color: #fff; cursor: pointer; font-size: 13px;">创建我的世界</button>
+  </div>
+
+  <a-scene device-orientation-permission-ui="enabled: false" loading-screen="enabled: true"
+    xr-mode-ui="enterVRButton: #myEnterVRButton; enterARButton: #myEnterARButton; XRMode: none">
+
+    <!-- 资产管理部分 -->
+    <a-assets>
+      <!-- 环境贴图 -->
+      <img id="skyTexture" src="./yard2_compressed.jpg">
+
+      <!-- 3D模型 -->
+      <a-asset-item id="fairyModel" src="./fairy_compressed.glb"></a-asset-item>
+    </a-assets>
+
+    <!-- 天空盒 - 默认隐藏，等待world-config.js加载配置后显示 -->
+    <a-sky id="sky" src="#skyTexture" rotation="0 -90 0" visible="false"></a-sky>
+
+    <!-- 相机装备 -->
+    <a-entity id="rig" position="0 1.6 0">
+      <a-camera wasd-controls="acceleration: 200" look-controls>
+        <!-- 身外化身 - 默认不加载模型，由world-config.js根据用户配置决定 -->
+        <a-entity id="fairy" position="-1 -0.1 -2" rotation="0 -120 0" scale="1 1 1" visible="false"
+          animation__rotate="property: rotation;
+                          to: 0 360000 0;
+                          loop: true;
+                          dur: 36000000;
+                          easing: linear">
+        </a-entity>
+
+      </a-camera>
+    </a-entity>
+  </a-scene>
+
+  <script src="./component.js"></script>
+  <script src="./chat.js"></script>
+  <script src="./world-config.js"></script>
+  <script>
+  </script>
+</body>
+
+</html>

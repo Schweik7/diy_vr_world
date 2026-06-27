@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - 交互式 - 体素绘画器</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+		<style>
+			body {
+				background-color: #f0f0f0;
+				color: #444;
+			}
+			a {
+				color: #08f;
+			}
+		</style>
+	</head>
+	<body>
+		<!-- 页面上显示的用户操作指南 -->
+		<div id="info">
+			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> - 体素绘画器 - webgl<br>
+			<strong>点击</strong>: 添加体素, <strong>按住Shift点击</strong>: 删除体素
+		</div>
+
+		<!-- 定义模块导入映射，指定Three.js模块的位置 -->
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../build/three.module.js",
+					"three/addons/": "./jsm/"
+				}
+			}
+		</script>
+
+		<script type="module">
+			// 导入完整的Three.js库
+			import * as THREE from 'three';
+
+			// 全局变量：管理3D场景和交互
+			let camera, scene, renderer;  // 渲染的核心组件
+			let plane;  // 用于射线检测的不可见平面
+			let pointer, raycaster, isShiftDown = false;  // 交互追踪变量
+
+			// 视觉辅助和对象几何体
+			let rollOverMesh, rollOverMaterial;  // 放置体素的预览网格
+			let cubeGeo, cubeMaterial;  // 实际体素的几何体和材质
+
+			// 追踪场景中所有交互对象的数组
+			const objects = [];
+
+			// 初始化场景
+			function init() {
+				// 创建透视相机
+				// 参数：视野角度、宽高比、近裁剪面、远裁剪面
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000 );
+				// 设置相机位置和观察方向
+				camera.position.set( 500, 800, 1300 );  // 在3D空间中定位相机
+				camera.lookAt( 0, 0, 0 );  // 让相机看向场景中心
+
+				// 创建场景
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xf0f0f0 );  // 设置场景背景颜色
+
+				// 创建"悬停"预览网格
+				// 当鼠标移动时，这个红色半透明网格显示将要放置体素的位置
+				const rollOverGeo = new THREE.BoxGeometry( 50, 50, 50 );  // 创建与体素相同大小的几何体
+				rollOverMaterial = new THREE.MeshBasicMaterial( { 
+					color: 0xff0000,  // 红色
+					opacity: 0.5,     // 50%透明度
+					transparent: true // 启用透明效果
+				} );
+				rollOverMesh = new THREE.Mesh( rollOverGeo, rollOverMaterial );
+				scene.add( rollOverMesh );  // 将预览网格添加到场景
+
+				// 创建实际体素的材质和几何体
+				const map = new THREE.TextureLoader().load( 'textures/square-outline-textured.png' );
+				map.colorSpace = THREE.SRGBColorSpace;
+				cubeGeo = new THREE.BoxGeometry( 50, 50, 50 );  // 每个体素的尺寸
+				cubeMaterial = new THREE.MeshLambertMaterial( { 
+					color: 0xfeb74c,  // 橙黄色
+					map: map  // 应用纹理贴图
+				} );
+
+				// 添加网格辅助线，帮助用户定位
+				const gridHelper = new THREE.GridHelper( 1000, 20 );
+				scene.add( gridHelper );
+
+				// 设置射线投射器，用于鼠标交互检测
+				raycaster = new THREE.Raycaster();
+				pointer = new THREE.Vector2();
+
+				// 创建不可见的交互平面
+				const geometry = new THREE.PlaneGeometry( 1000, 1000 );
+				geometry.rotateX( - Math.PI / 2 );  // 将平面旋转到水平位置
+
+				plane = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { visible: false } ) );
+				scene.add( plane );
+
+				// 将平面添加到可交互对象列表
+				objects.push( plane );
+
+				// 添加场景光照
+				const ambientLight = new THREE.AmbientLight( 0x606060, 3 );  // 环境光，柔和均匀地照亮场景
+				scene.add( ambientLight );
+
+				const directionalLight = new THREE.DirectionalLight( 0xffffff, 3 );  // 方向光，模拟太阳光
+				directionalLight.position.set( 1, 0.75, 0.5 ).normalize();
+				scene.add( directionalLight );
+
+				// 创建渲染器
+				renderer = new THREE.WebGLRenderer( { antialias: true } );  // 启用抗锯齿
+				renderer.setPixelRatio( window.devicePixelRatio );  // 匹配设备像素比
+				renderer.setSize( window.innerWidth, window.innerHeight );  // 填充整个窗口
+				document.body.appendChild( renderer.domElement );  // 将渲染器添加到网页
+
+				// 添加事件监听器
+				document.addEventListener( 'pointermove', onPointerMove );  // 鼠标移动事件
+				document.addEventListener( 'pointerdown', onPointerDown );  // 鼠标点击事件
+				document.addEventListener( 'keydown', onDocumentKeyDown );  // 键盘按下事件
+				document.addEventListener( 'keyup', onDocumentKeyUp );  // 键盘释放事件
+
+				// 监听窗口大小变化
+				window.addEventListener( 'resize', onWindowResize );
+			}
+
+			// 窗口大小调整事件处理函数
+			function onWindowResize() {
+				// 更新相机的宽高比
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();  // 更新投影矩阵
+
+				// 调整渲染器大小
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				// 重新渲染场景
+				render();
+			}
+
+			// 鼠标移动事件处理
+			function onPointerMove( event ) {
+				// 将鼠标坐标转换为标准化的设备坐标（-1 到 1）
+				pointer.set( 
+					( event.clientX / window.innerWidth ) * 2 - 1, 
+					- ( event.clientY / window.innerHeight ) * 2 + 1 
+				);
+
+				// 从相机发射射线到鼠标位置
+				raycaster.setFromCamera( pointer, camera );
+
+				// 检测射线与场景中对象的交互
+				const intersects = raycaster.intersectObjects( objects, false );
+
+				// 如果射线与某个对象相交
+				if ( intersects.length > 0 ) {
+					const intersect = intersects[ 0 ];
+
+					// 移动"悬停"预览网格到交互点
+					rollOverMesh.position.copy( intersect.point ).add( intersect.face.normal );
+					rollOverMesh.position.divideScalar( 50 ).floor().multiplyScalar( 50 ).addScalar( 25 );
+
+					// 重新渲染场景
+					render();
+				}
+			}
+
+			// 鼠标点击事件处理
+			function onPointerDown( event ) {
+				// 转换鼠标坐标
+				pointer.set( 
+					( event.clientX / window.innerWidth ) * 2 - 1, 
+					- ( event.clientY / window.innerHeight ) * 2 + 1 
+				);
+
+				// 发射射线
+				raycaster.setFromCamera( pointer, camera );
+
+				// 检测交互对象
+				const intersects = raycaster.intersectObjects( objects, false );
+
+				// 如果有交互对象
+				if ( intersects.length > 0 ) {
+					const intersect = intersects[ 0 ];
+
+					// 如果按住Shift键，删除体素
+					if ( isShiftDown ) {
+						if ( intersect.object !== plane ) {
+							scene.remove( intersect.object );
+							objects.splice( objects.indexOf( intersect.object ), 1 );
+						}
+					} 
+					// 否则创建新的体素
+					else {
+						const voxel = new THREE.Mesh( cubeGeo, cubeMaterial );
+						voxel.position.copy( intersect.point ).add( intersect.face.normal );
+						voxel.position.divideScalar( 50 ).floor().multiplyScalar( 50 ).addScalar( 25 );
+						scene.add( voxel );
+
+						objects.push( voxel );
+					}
+
+					// 重新渲染场景
+					render();
+				}
+			}
+
+			// 键盘按下事件处理
+			function onDocumentKeyDown( event ) {
+				// 检测Shift键是否按下
+				switch ( event.keyCode ) {
+					case 16: isShiftDown = true; break;
+				}
+			}
+
+			// 键盘释放事件处理
+			function onDocumentKeyUp( event ) {
+				// 检测Shift键是否释放
+				switch ( event.keyCode ) {
+					case 16: isShiftDown = false; break;
+				}
+			}
+
+			// 渲染场景
+			function render() {
+				renderer.render( scene, camera );
+			}
+
+			// 初始化和第一次渲染
+			init();
+			render();
+		</script>
+	</body>
+</html>

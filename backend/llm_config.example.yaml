@@ -1,0 +1,28 @@
+# LLM配置文件模板
+# 使用方法：复制本文件为 llm_config.yaml，并填入你自己的密钥
+#   cp llm_config.example.yaml llm_config.yaml
+# 注意：llm_config.yaml 已在 .gitignore 中，请勿提交真实密钥
+# 第一个配置项为默认使用的LLM
+
+llms:
+  - id: deepseek
+    name: DeepSeek
+    provider: openai_compatible
+    api_key: YOUR_DEEPSEEK_API_KEY        # 在此填入 DeepSeek 密钥
+    base_url: https://api.deepseek.com
+    default_model: deepseek-v4-flash
+    models:
+      - deepseek-v4-flash
+    enabled: true
+
+  - id: claude
+    name: Claude
+    provider: anthropic
+    api_key_env: ANTHROPIC_API_KEY        # 从环境变量读取（见 .env）
+    # proxy: http://127.0.0.1:7890        # 如需代理访问，取消注释
+    default_model: claude-sonnet-4-20250514
+    models:
+      - claude-sonnet-4-20250514
+      - claude-3-5-sonnet-20241022
+      - claude-3-5-haiku-20241022
+    enabled: true
