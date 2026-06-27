@@ -543,10 +543,20 @@ async def chat_with_claude_websocket_via_stream(websocket: WebSocket, world_id: 
     try:
         while True:
             data = await websocket.receive_json()
+
+            # 心跳消息：回复pong后跳过，避免被当作空对话触发NPC主动说话
+            if data.get("type") == "ping":
+                await websocket.send_text("pong")
+                continue
+
             user_message = data.get("content", "")
             llm_id = data.get("llm_id")  # 可选的LLM ID
             model = data.get("model")  # 可选的模型名称
             max_tokens = data.get("max_tokens", 2048)
+
+            # 忽略空消息，必须等用户真正输入后才回应
+            if not user_message.strip():
+                continue
 
             with Session(engine) as session:
                 chat = Chat(user_id=user.id, world_id=world_id, role="user", content=user_message)
@@ -633,10 +643,20 @@ async def chat_with_claude_websocket(websocket: WebSocket, world_id: Optional[in
     try:
         while True:
             data = await websocket.receive_json()
+
+            # 心跳消息：回复pong后跳过，避免被当作空对话触发NPC主动说话
+            if data.get("type") == "ping":
+                await websocket.send_text("pong")
+                continue
+
             user_message = data.get("content", "")
             llm_id = data.get("llm_id")  # 可选的LLM ID
             model = data.get("model")  # 可选的模型名称
             max_tokens = data.get("max_tokens", 2048)
+
+            # 忽略空消息，必须等用户真正输入后才回应
+            if not user_message.strip():
+                continue
 
             with Session(engine) as session:
                 chat = Chat(user_id=user.id, world_id=world_id, role="user", content=user_message)
