@@ -993,6 +993,29 @@ _frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../fron
 async def serve_index():
     return FileResponse(os.path.join(_frontend_dir, "index.html"))
 
+@app.get("/u/{username}")
+@app.get("/u/{username}/{world_id}")
+async def serve_user_space(username: str, world_id: Optional[int] = None):
+    """显式用户名空间页面：用户不存在或无公开场景时返回真正的404"""
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail=f"用户 {username} 不存在")
+
+        public_worlds = session.exec(
+            select(World).where(
+                World.user_id == user.id, World.is_public == True  # noqa: E712
+            )
+        ).all()
+        if not public_worlds:
+            raise HTTPException(status_code=404, detail=f"{username} 还没有公开的心声场景")
+
+        # 指定了场景ID时，校验该场景属于此用户且为公开
+        if world_id is not None and not any(w.id == world_id for w in public_worlds):
+            raise HTTPException(status_code=404, detail="该场景不存在或未公开")
+
+    return FileResponse(os.path.join(_frontend_dir, "index.html"))
+
 @app.get("/{path:path}")
 async def serve_static(path: str):
     file_path = os.path.join(_frontend_dir, path)
