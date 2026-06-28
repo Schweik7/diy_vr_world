@@ -22,11 +22,27 @@ class WorldConfig {
         const username = localStorage.getItem("username");
         if (username) {
             await this.loadUserData(username);
+            // 已登录用户统一停留在 /u/<用户名> 路由（默认场景之外）
+            this.syncOwnerUrl(username);
+            // 若 URL 指定了具体场景，进入该场景
+            if (this._ownerPathWorldId && this.worlds && this.worlds.some(w => w.id === this._ownerPathWorldId)) {
+                this.enterScene(this._ownerPathWorldId);
+            }
+            this._ownerPathWorldId = null;
         } else {
             // 没有登录时，显示默认场景
             this.showDefaultScene();
         }
         this.setupEventListeners();
+    }
+
+    // 已登录时把地址栏同步为 /u/<用户名>（不刷新页面）
+    syncOwnerUrl(username) {
+        const onUserPath = /^\/u\//.test(window.location.pathname);
+        if (!onUserPath) {
+            const target = `/u/${encodeURIComponent(username)}`;
+            try { window.history.replaceState({}, '', target); } catch (e) { /* 忽略 */ }
+        }
     }
 
     showDefaultScene() {
@@ -264,6 +280,15 @@ class WorldConfig {
         bind('library-button', () => this.openLibrary());
         bind('close-library', () => this.closeModal('library-modal'));
         bind('save-scene-meta', () => this.saveSceneMeta());
+        bind('logout-btn', () => this.logout());
+    }
+
+    // 退出登录：清除本地用户，回到默认场景（根路由）
+    logout() {
+        if (!confirm('确定退出登录吗？')) return;
+        localStorage.removeItem('username');
+        // 回到根路由的默认场景，彻底重置状态
+        window.location.href = window.location.origin + '/';
     }
 
     closeModal(id) {
@@ -1077,6 +1102,12 @@ class WorldConfig {
         let worldId = pathMatch && pathMatch[2] ? parseInt(pathMatch[2], 10) : (urlParams.get('world') ? parseInt(urlParams.get('world'), 10) : null);
 
         if (username) {
+            const me = localStorage.getItem('username');
+            if (me && me === username) {
+                // 本人访问自己的空间 → 走正常登录模式（可编辑），不进访客模式
+                this._ownerPathWorldId = worldId;
+                return false;
+            }
             this.isVisitorMode = true;
             this.loadUserSpace(username, worldId);
             return true;
@@ -1208,6 +1239,7 @@ class WorldConfig {
 WorldConfig.prototype.handleLogin = async function (username) {
     if (!username) return;
     await this.loadUserData(username);
+    this.syncOwnerUrl(username);
     if (window.reconnectWebSocket) window.reconnectWebSocket();
 };
 

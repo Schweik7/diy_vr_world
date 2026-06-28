@@ -996,23 +996,15 @@ async def serve_index():
 @app.get("/u/{username}")
 @app.get("/u/{username}/{world_id}")
 async def serve_user_space(username: str, world_id: Optional[int] = None):
-    """显式用户名空间页面：用户不存在或无公开场景时返回真正的404"""
+    """显式用户名空间页面：用户不存在时返回真正的404。
+
+    用户存在即返回页面（本人可编辑自己的私密场景，访客只能看到其公开场景，
+    由前端区分本人/访客）。
+    """
     with Session(engine) as session:
         user = session.exec(select(User).where(User.username == username)).first()
         if not user:
             raise HTTPException(status_code=404, detail=f"用户 {username} 不存在")
-
-        public_worlds = session.exec(
-            select(World).where(
-                World.user_id == user.id, World.is_public == True  # noqa: E712
-            )
-        ).all()
-        if not public_worlds:
-            raise HTTPException(status_code=404, detail=f"{username} 还没有公开的心声场景")
-
-        # 指定了场景ID时，校验该场景属于此用户且为公开
-        if world_id is not None and not any(w.id == world_id for w in public_worlds):
-            raise HTTPException(status_code=404, detail="该场景不存在或未公开")
 
     return FileResponse(os.path.join(_frontend_dir, "index.html"))
 
