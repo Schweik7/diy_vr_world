@@ -382,27 +382,50 @@ class WorldConfig {
         const sky = document.querySelector('#sky');
         if (!sky) return;
 
-        // 立即隐藏当前sky，避免闪烁
-        sky.setAttribute('visible', 'false');
+        const applyTexture = () => {
+            const mesh = sky.getObject3D('mesh');
+            const THREEref = window.THREE || (window.AFRAME && window.AFRAME.THREE);
+            if (!mesh || !THREEref) {
+                // 网格还没就绪，下一帧重试
+                requestAnimationFrame(applyTexture);
+                return;
+            }
 
-        // 创建新的图片元素来预加载
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-            // 图片加载完成后，直接设置天空盒的src为完整URL
-            sky.setAttribute('src', fullPath);
-            // 短暂延迟后显示，确保A-Frame处理完成
-            setTimeout(() => {
-                sky.setAttribute('visible', 'true');
-                console.log('天空贴图已更新');
-            }, 100);
+            const loader = new THREEref.TextureLoader();
+            loader.setCrossOrigin('anonymous');
+            sky.setAttribute('visible', 'false');
+            loader.load(
+                fullPath,
+                (texture) => {
+                    // 等距柱状全景图：标准UV贴在球面内侧
+                    if ('colorSpace' in texture && THREEref.SRGBColorSpace) {
+                        texture.colorSpace = THREEref.SRGBColorSpace;
+                    } else if ('encoding' in texture && THREEref.sRGBEncoding) {
+                        texture.encoding = THREEref.sRGBEncoding;
+                    }
+                    const material = mesh.material;
+                    const oldMap = material.map;
+                    material.map = texture;
+                    material.needsUpdate = true;
+                    if (oldMap && oldMap !== texture) oldMap.dispose();
+                    // 同步 A-Frame 内部状态，避免后续 src 操作复原旧贴图
+                    sky.setAttribute('src', fullPath);
+                    sky.setAttribute('visible', 'true');
+                    console.log('天空贴图已更新（直接替换球面贴图）');
+                },
+                undefined,
+                (e) => {
+                    console.error('天空贴图加载失败:', e);
+                    sky.setAttribute('visible', 'true');
+                }
+            );
         };
-        img.onerror = (e) => {
-            console.error('天空贴图加载失败:', e);
-            // 加载失败时恢复显示
-            sky.setAttribute('visible', 'true');
-        };
-        img.src = fullPath;
+
+        if (sky.getObject3D('mesh')) {
+            applyTexture();
+        } else {
+            sky.addEventListener('loaded', applyTexture, { once: true });
+        }
     }
 
     updateFairyModel(fullPath) {
@@ -952,9 +975,14 @@ class WorldConfig {
         if (linkContainer) linkContainer.style.display = 'block';
         if (generateContainer) generateContainer.style.display = 'none';
 
-        // 构建分享链接
-        const baseUrl = window.location.origin + window.location.pathname;
-        const shareUrl = `${baseUrl}?share=${shareCode}`;
+        // 构建分享链接：优先使用显式用户名URL（/u/<用户名>/<场景id>），更友好可读
+        const username = localStorage.getItem('username');
+        let shareUrl;
+        if (username && this.currentWorldId) {
+            shareUrl = `${window.location.origin}/u/${encodeURIComponent(username)}/${this.currentWorldId}`;
+        } else {
+            shareUrl = `${window.location.origin}/?share=${shareCode}`;
+        }
 
         if (linkInput) {
             linkInput.value = shareUrl;
@@ -962,8 +990,8 @@ class WorldConfig {
         }
 
         // 生成分享文案
-        const username = localStorage.getItem('username') || '我';
-        const shareText = `${username}邀请你来探索TA的心灵世界！\n\n这是一个充满魔法的森林，有可爱的精灵等你来聊天~\n\n点击链接进入：${shareUrl}`;
+        const displayName = username || '我';
+        const shareText = `${displayName}邀请你来探索TA的心灵世界！\n\n这是一个充满魔法的森林，有可爱的精灵等你来聊天~\n\n点击链接进入：${shareUrl}`;
 
         if (textArea) {
             textArea.value = shareText;
@@ -1031,7 +1059,44 @@ class WorldConfig {
             this.loadSharedWorld(shareCode);
             return true;
         }
+
+        // 显式用户名URL：/u/<用户名> 或 /u/<用户名>/<场景id>，也兼容 ?user=&world=
+        const pathMatch = window.location.pathname.match(/^\/u\/([^\/]+)(?:\/(\d+))?\/?$/);
+        let username = pathMatch ? decodeURIComponent(pathMatch[1]) : urlParams.get('user');
+        let worldId = pathMatch && pathMatch[2] ? parseInt(pathMatch[2], 10) : (urlParams.get('world') ? parseInt(urlParams.get('world'), 10) : null);
+
+        if (username) {
+            this.isVisitorMode = true;
+            this.loadUserSpace(username, worldId);
+            return true;
+        }
         return false;
+    }
+
+    // 通过显式用户名加载其公开空间/场景
+    async loadUserSpace(username, worldId) {
+        try {
+            const resp = await fetch(`${this.apiBase}/api/space/${encodeURIComponent(username)}`);
+            if (!resp.ok) {
+                alert('该用户空间不存在或暂未公开任何场景');
+                this.showDefaultScene();
+                return;
+            }
+            const space = await resp.json();
+            const worlds = space.worlds || [];
+            if (worlds.length === 0) {
+                alert(`${username} 还没有公开的心声场景`);
+                this.showDefaultScene();
+                return;
+            }
+            // 选定场景：URL指定的优先，否则取最热门的第一个
+            let target = worldId ? worlds.find(w => w.id === worldId) : null;
+            if (!target) target = worlds[0];
+            await this.visitScene(target.id);
+        } catch (e) {
+            console.error('加载用户空间失败:', e);
+            this.showDefaultScene();
+        }
     }
 
     async loadSharedWorld(shareCode) {
@@ -1043,7 +1108,7 @@ class WorldConfig {
             } else {
                 alert('分享链接无效或已过期');
                 this.showDefaultScene();
-                window.location.href = window.location.pathname;
+                window.location.href = window.location.origin + "/";
             }
         } catch (error) {
             console.error('加载分享世界失败:', error);
@@ -1122,14 +1187,22 @@ class WorldConfig {
         const createBtn = document.getElementById('create-own-world');
         if (createBtn) {
             createBtn.addEventListener('click', () => {
-                window.location.href = window.location.pathname;
+                window.location.href = window.location.origin + "/";
             });
         }
     }
 }
 
+// 登录成功后刷新用户数据（设置 currentUserId / 加载场景 / 重连WS）
+WorldConfig.prototype.handleLogin = async function (username) {
+    if (!username) return;
+    await this.loadUserData(username);
+    if (window.reconnectWebSocket) window.reconnectWebSocket();
+};
+
 // 创建全局实例
 const worldConfig = new WorldConfig();
+window.worldConfig = worldConfig;
 
 // 页面加载后初始化
 document.addEventListener('DOMContentLoaded', () => {

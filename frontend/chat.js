@@ -212,6 +212,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 usernameModal.style.display = "none";
                 localStorage.setItem("username", username);
+                // 立即刷新用户数据，使个人中心能找到自己的场景（无需手动刷新页面）
+                if (window.worldConfig) {
+                    await window.worldConfig.handleLogin(username);
+                }
             } catch (error) {
                 console.error("用户名设置失败:", error);
                 alert("无法设置用户名，请重试。");

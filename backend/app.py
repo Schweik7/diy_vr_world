@@ -295,6 +295,36 @@ async def list_public_worlds(limit: int = 60, offset: int = 0):
             for w in worlds
         ]
 
+@app.get("/api/space/{username}")
+async def get_user_space(username: str):
+    """通过用户名访问其空间：返回用户公开的心声场景列表（用于显式用户名URL）"""
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户未找到")
+
+        worlds = session.exec(
+            select(World)
+            .where(World.user_id == user.id, World.is_public == True)  # noqa: E712
+            .order_by(World.view_count.desc(), World.created_at.desc())
+        ).all()
+
+        return {
+            "user_id": user.id,
+            "username": user.username,
+            "worlds": [
+                {
+                    "id": w.id,
+                    "name": w.name,
+                    "description": w.description,
+                    "cover_image": w.cover_image,
+                    "sky_texture": w.sky_texture,
+                    "view_count": w.view_count or 0,
+                }
+                for w in worlds
+            ],
+        }
+
 @app.get("/api/worlds/visit/{world_id}")
 async def visit_public_world(world_id: int):
     """体验一个公开场景：校验公开状态、累加体验次数并返回完整配置"""
