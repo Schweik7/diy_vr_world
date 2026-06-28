@@ -382,50 +382,61 @@ class WorldConfig {
         const sky = document.querySelector('#sky');
         if (!sky) return;
 
-        const applyTexture = () => {
-            const mesh = sky.getObject3D('mesh');
-            const THREEref = window.THREE || (window.AFRAME && window.AFRAME.THREE);
-            if (!mesh || !THREEref) {
-                // 网格还没就绪，下一帧重试
-                requestAnimationFrame(applyTexture);
-                return;
-            }
+        // 记录本次要加载的目标贴图；后续异步回调据此判断是否仍是最新请求，
+        // 避免页面初始时“默认天空贴图”与“用户自定义贴图”两个异步加载相互覆盖。
+        this._pendingSky = fullPath;
 
-            const loader = new THREEref.TextureLoader();
-            loader.setCrossOrigin('anonymous');
-            sky.setAttribute('visible', 'false');
-            loader.load(
-                fullPath,
-                (texture) => {
-                    // 等距柱状全景图：标准UV贴在球面内侧
-                    if ('colorSpace' in texture && THREEref.SRGBColorSpace) {
-                        texture.colorSpace = THREEref.SRGBColorSpace;
-                    } else if ('encoding' in texture && THREEref.sRGBEncoding) {
-                        texture.encoding = THREEref.sRGBEncoding;
-                    }
-                    const material = mesh.material;
-                    const oldMap = material.map;
-                    material.map = texture;
-                    material.needsUpdate = true;
-                    if (oldMap && oldMap !== texture) oldMap.dispose();
-                    // 同步 A-Frame 内部状态，避免后续 src 操作复原旧贴图
-                    sky.setAttribute('src', fullPath);
-                    sky.setAttribute('visible', 'true');
-                    console.log('天空贴图已更新（直接替换球面贴图）');
-                },
-                undefined,
-                (e) => {
-                    console.error('天空贴图加载失败:', e);
-                    sky.setAttribute('visible', 'true');
+        const THREEref = window.THREE || (window.AFRAME && window.AFRAME.THREE);
+
+        // 强制球面以内壁(BackSide)渲染并使用sRGB——这是“有时变成平面图/反面”的根因：
+        // 直接改 material.map 时若 side 仍是默认 FrontSide，全景就会渲染成内外翻转的平面。
+        const enforceSphere = () => {
+            const mesh = sky.getObject3D('mesh');
+            if (!mesh || !mesh.material) return false;
+            const mat = mesh.material;
+            if (THREEref && THREEref.BackSide !== undefined) mat.side = THREEref.BackSide;
+            if (mat.map && THREEref) {
+                if ('colorSpace' in mat.map && THREEref.SRGBColorSpace) {
+                    mat.map.colorSpace = THREEref.SRGBColorSpace;
+                } else if ('encoding' in mat.map && THREEref.sRGBEncoding) {
+                    mat.map.encoding = THREEref.sRGBEncoding;
                 }
-            );
+                mat.map.needsUpdate = true;
+            }
+            mat.needsUpdate = true;
+            return true;
         };
 
-        if (sky.getObject3D('mesh')) {
-            applyTexture();
-        } else {
-            sky.addEventListener('loaded', applyTexture, { once: true });
-        }
+        const onTextureLoaded = (evt) => {
+            // 过期请求（用户又切换了场景）直接忽略
+            if (this._pendingSky !== fullPath) return;
+            const d = (evt && evt.detail) || {};
+            const loadedSrc = d.src ? (d.src.src || d.src.getAttribute && d.src.getAttribute('src') || d.src) : '';
+            // 只认本次目标贴图的加载完成事件，默认贴图等其它来源继续等待
+            if (loadedSrc && !String(loadedSrc).includes(fullPath) && !fullPath.includes(String(loadedSrc))) {
+                sky.addEventListener('materialtextureloaded', onTextureLoaded, { once: true });
+                return;
+            }
+            enforceSphere();
+            sky.setAttribute('visible', 'true');
+            // 双保险：随后再强制一次，防止材质在本帧之后被重建覆盖
+            requestAnimationFrame(enforceSphere);
+            setTimeout(enforceSphere, 120);
+            console.log('天空全景已更新');
+        };
+
+        sky.setAttribute('visible', 'false');
+        sky.addEventListener('materialtextureloaded', onTextureLoaded, { once: true });
+        // 兜底：即便没收到加载事件（如贴图已缓存），也确保球面正确显示
+        setTimeout(() => {
+            if (this._pendingSky === fullPath) { enforceSphere(); sky.setAttribute('visible', 'true'); }
+        }, 1500);
+        // 交由 A-Frame 材质系统加载，保证等距柱状全景的UV/flipY/npot处理正确，
+        // 同时显式声明球面内壁渲染。
+        sky.setAttribute('material', 'shader', 'flat');
+        sky.setAttribute('material', 'side', 'back');
+        sky.setAttribute('material', 'npot', true);
+        sky.setAttribute('material', 'src', fullPath);
     }
 
     updateFairyModel(fullPath) {
